@@ -1,6 +1,7 @@
 import streamlit as st
 from transformers import pipeline
 from PIL import Image
+import tempfile
 
 st.set_page_config(page_title="AI Playground", layout="centered")
 
@@ -29,7 +30,8 @@ def load_image_classifier():
 
 @st.cache_resource
 def load_asr():
-    return pipeline("automatic-speech-recognition")
+    # 👇 use tiny model (important for deployment)
+    return pipeline("automatic-speech-recognition", model="openai/whisper-tiny")
 
 # ------------------ SENTIMENT ------------------
 
@@ -76,20 +78,25 @@ elif task == "Image Classification":
             for r in results[:5]:
                 st.write(f"{r['label']} : {r['score']:.4f}")
 
-# ------------------ SPEECH TO TEXT ------------------
+# ------------------ SPEECH TO TEXT (FIXED) ------------------
 
 elif task == "Speech to Text":
     uploaded_file = st.file_uploader(
         "Upload audio", type=["wav", "mp3", "flac"])
 
     if uploaded_file:
-        audio_bytes = uploaded_file.read()
-        st.audio(audio_bytes)
+        st.audio(uploaded_file)
 
         if st.button("Transcribe"):
             model = load_asr()
+
+            # ✅ FIX: save file temporarily (avoids ffmpeg error)
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_file.write(uploaded_file.read())
+                tmp_path = tmp_file.name
+
             with st.spinner("Transcribing..."):
-                result = model(audio_bytes)
+                result = model(tmp_path)
 
             st.success("Transcription:")
             st.write(result['text'])
